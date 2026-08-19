@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Xmile — Audio-reactive visuals</title>
+<meta name="description" content="Audio-reactive visuals and realtime systems. Every piece plays with the track it was generated from.">
+<meta name="theme-color" content="#0A0A0A">
+<meta property="og:title" content="Xmile — Audio-reactive visuals">
+<meta property="og:description" content="Generative visuals driven by sound. Hover any piece to hear the track it came from.">
+<meta property="og:image" content="media/hero/hero_poster.jpg">
+<link rel="stylesheet" href="assets/fonts.css">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="g">
+    <span class="wm" data-t="site.wordmark">XMILE</span>
+    <span class="lb" data-t="site.tagline">Audio-reactive visuals</span>
+  </div>
+  <nav class="lb" id="nav"></nav>
+  <div class="g">
+    <button class="snd" id="sndBtn" aria-pressed="false" title="Hover a tile to hear it">
+      <span class="eq"><i></i><i></i><i></i><i></i></span>
+      <span class="lb hi" id="sndLbl">Sound / off</span>
+    </button>
+  </div>
+</header>
+
+<section class="hero" id="hero">
+  <video id="heroVid" autoplay muted loop playsinline preload="auto"></video>
+  <div class="scrim"></div>
+  <div class="grain"></div>
+  <div class="in">
+    <span class="lb" data-t="hero.kicker"></span>
+    <h1 class="sans"><span data-t="hero.headline"></span> <em data-t="hero.headlineAccent"></em></h1>
+    <div class="row">
+      <div class="mrow" id="heroCols"></div>
+      <p class="lede" data-t="hero.lede"></p>
+    </div>
+    <div class="foot">
+      <span class="lb" id="heroHint">Hover a piece — it plays with its own sound</span>
+      <span class="lb">Reel · running muted</span>
+      <span class="lb"><span id="workCount">0</span> below ↓</span>
+    </div>
+  </div>
+</section>
+
+<div class="stats" id="stats"></div>
+
+<div class="fb">
+  <div class="chips" id="chips"></div>
+  <span class="lb" id="sortLbl">Sort · recent</span>
+</div>
+
+<main class="wall" id="wall"></main>
+<noscript><p>This archive needs JavaScript to play the work. Write to hello@xmile.studio and I will send the reel directly.</p></noscript>
+
+<footer>
+  <span class="lb">Available for commissions</span>
+  <h2 class="sans" style="margin-top:14px">Let's make it<br>move to sound</h2>
+  <div class="frow">
+    <a class="lb" id="mailLink" href="#"></a>
+    <span class="lb" data-t="site.socials"></span>
+    <span class="lb" data-t="site.copyright"></span>
+  </div>
+</footer>
+
+<!-- fullscreen player -->
+<div class="player" id="player" role="dialog" aria-modal="true">
+  <div class="ph">
+    <div class="meta">
+      <span class="lb" id="plIdx"></span>
+      <h3 class="sans" id="plTitle"></h3>
+    </div>
+    <div class="meta">
+      <span class="lb" id="plMeta"></span>
+      <button class="pbtn" id="plClose">Close · esc</button>
+    </div>
+  </div>
+  <div class="stage"><video id="plVid" controls playsinline></video></div>
+  <div class="pf">
+    <span class="lb" id="plFam"></span>
+    <div class="nav">
+      <button class="pbtn" id="plPrev">← Prev</button>
+      <button class="pbtn" id="plNext">Next →</button>
+    </div>
+  </div>
+</div>
+
+<!-- edit-mode chrome (inert unless ?edit) -->
+<div class="ebar" id="ebar">
+  <div class="g">
+    <span class="dot" id="eDot"></span>
+    <span class="lb hi">Edit mode</span>
+    <span class="lb" id="eStatus">local — nothing saved yet</span>
+  </div>
+  <div class="g">
+    <button class="pbtn" id="eAdd">+ Add work</button>
+    <button class="pbtn" id="eHero">Replace hero video</button>
+    <button class="pbtn" id="eFiles">Download media</button>
+    <button class="pbtn" id="eExport">Download content.json</button>
+    <button class="pbtn pri" id="eSave">Save</button>
+    <button class="pbtn" id="eExit">Exit</button>
+  </div>
+</div>
+
+<div class="dlg" id="dlg">
+  <div class="box">
+    <div class="dh"><span class="lb hi" id="dlgTitle">Add work</span><button class="pbtn" id="dlgX">Cancel</button></div>
+    <div class="body">
+      <div class="prev">
+        <video id="dv" playsinline muted></video>
+        <div class="fld" style="margin-top:14px">
+          <label>Poster frame — <span id="pfT">0.0</span>s</label>
+          <input type="range" id="pf" min="0" max="100" step="0.1" value="0">
+          <div class="hint">The frame shown in the wall. Grabbed straight from the file, no upload needed.</div>
+        </div>
+        <div class="fld">
+          <label>Hover starts at — <span id="hsT">0.0</span>s</label>
+          <input type="range" id="hs" min="0" max="100" step="0.1" value="0">
+          <div class="hint">Where the sound kicks in when someone hovers the tile. Pick the strongest moment.</div>
+        </div>
+      </div>
+      <div class="form">
+        <div class="fld"><label>File</label>
+          <input type="file" id="dfFile" accept="video/*" style="font-size:11px">
+          <div class="hint" id="dfInfo">Export H.264 .mp4 from Resolve — 1080×1920 for vertical, CRF 22–26. HEVC will not play in browsers.</div>
+        </div>
+        <div class="fld"><label>Title</label><input type="text" id="dfTitle" placeholder="Mycelium"></div>
+        <div class="two">
+          <div class="fld"><label>Family</label><select id="dfFamily"></select></div>
+          <div class="fld"><label>Technique</label><select id="dfTech">
+            <option>Realtime</option><option>Audio-reactive</option><option>AI video</option><option>Composite</option></select></div>
+        </div>
+        <div class="two">
+          <div class="fld"><label>Engine</label><input type="text" id="dfEngine" placeholder="TouchDesigner"></div>
+          <div class="fld"><label>Year</label><input type="text" id="dfYear" placeholder="2026"></div>
+        </div>
+        <div class="two">
+          <div class="fld"><label>Framing</label><select id="dfFit">
+            <option value="cover">Fill the tile</option>
+            <option value="contain">Fit inside, black bars</option></select></div>
+          <div class="fld"><label>Tile width</label><select id="dfSpan">
+            <option value="1">One column (vertical)</option>
+            <option value="2">Two columns (horizontal)</option></select></div>
+        </div>
+      </div>
+    </div>
+    <div class="df">
+      <div><button class="pbtn" id="dlgDel" style="display:none">Delete this work</button></div>
+      <div class="g" style="display:flex;gap:8px">
+        <span class="lb" id="dlgStatus"></span>
+        <button class="pbtn pri" id="dlgOk">Save work</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="application/json" id="bootstrap">
+{
+  "site": {
+    "wordmark": "XMILE",
+    "tagline": "Audio-reactive visuals",
+    "nav": [
+      "Index",
+      "Reel",
+      "Studio",
+      "Contact"
+    ],
+    "email": "hello@xmile.studio",
+    "socials": "Instagram · Vimeo · Soundcloud",
+    "copyright": "© 2026 Xmile"
+  },
+  "hero": {
+    "kicker": "Xmile · audio-reactive visuals · since 2021",
+    "headline": "Visuals generated by the track,",
+    "headlineAccent": "not cut to it.",
+    "lede": "Every piece below plays with its own sound. Hover a tile and you hear the track it was generated from — the waveform drives geometry, displacement and light, and nothing is keyframed by hand.",
+    "columns": [
+      {
+        "label": "Discipline",
+        "value": "Audio-reactive video\nRealtime systems"
+      },
+      {
+        "label": "Engine",
+        "value": "TouchDesigner · GLSL\nComfyUI · Resolve"
+      },
+      {
+        "label": "For",
+        "value": "Clubs · festivals\nLabels · artists"
+      }
+    ],
+    "video": "media/hero/hero.mp4",
+    "videoMobile": "media/hero/hero_mobile.mp4",
+    "poster": "media/hero/hero_poster.jpg",
+    "note": "Backdrop only — this clip is not part of the archive."
+  },
+  "stats": [
+    {
+      "label": "Works",
+      "value": "auto:count"
+    },
+    {
+      "label": "Total runtime",
+      "value": "auto:runtime"
+    },
+    {
+      "label": "Render",
+      "value": "4K / 60"
+    },
+    {
+      "label": "Based in",
+      "value": "Barcelona"
+    },
+    {
+      "label": "Available",
+      "value": "Sep — Dec 2026"
+    }
+  ],
+  "families": [
+    {
+      "id": "organic",
+      "name": "Organic",
+      "note": "Microscopy, growth, fibre, tissue"
+    },
+    {
+      "id": "metal",
+      "name": "Metal",
+      "note": "Chrome, obsidian, liquid, specular"
+    },
+    {
+      "id": "structure",
+      "name": "Structure",
+      "note": "Geometry, grids, tessellation"
+    },
+    {
+      "id": "particle",
+      "name": "Particle",
+      "note": "Dust, swarms, point clouds, dissolve"
+    },
+    {
+      "id": "field",
+      "name": "Field",
+      "note": "Smoke, fluid, volumetric, atmosphere"
+    }
+  ],
+  "works": [
+    {
+      "id": "s01",
+      "title": "Untitled",
+      "family": "",
+      "technique": "",
+      "engine": "",
+      "year": 2026,
+      "src": "",
+      "poster": "",
+      "duration": 0,
+      "previewStart": 0,
+      "fit": "cover",
+      "span": 1,
+      "placeholder": true
+    },
+    {
+      "id": "s02",
+      "title": "Untitled",
+      "family": "",
+      "technique": "",
+      "engine": "",
+      "year": 2026,
+      "src": "",
+      "poster": "",
+      "duration": 0,
+      "previewStart": 0,
+      "fit": "cover",
+      "span": 1,
+      "placeholder": true
+    },
+    {
+      "id": "s03",
+      "title": "Untitled",
+      "family": "",
+      "technique": "",
+      "engine": "",
+      "year": 2026,
+      "src": "",
+      "poster": "",
+      "duration": 0,
+      "previewStart": 0,
+      "fit": "cover",
+      "span": 1,
+      "placeholder": true
+    },
+    {
+      "id": "s04",
+      "title": "Untitled",
+      "family": "",
+      "technique": "",
+      "engine": "",
+      "year": 2026,
+      "src": "",
+      "poster": "",
+      "duration": 0,
+      "previewStart": 0,
+      "fit": "cover",
+      "span": 1,
+      "placeholder": true
+    },
+    {
+      "id": "s05",
+      "title": "Untitled",
+      "family": "",
+      "technique": "",
+      "engine": "",
+      "year": 2026,
+      "src": "",
+      "poster": "",
+      "duration": 0,
+      "previewStart": 0,
+      "fit": "cover",
+      "span": 1,
+      "placeholder": true
+    },
+    {
+      "id": "s06",
+      "title": "Untitled",
+      "family": "",
+      "technique": "",
+      "engine": "",
+      "year": 2026,
+      "src": "",
+      "poster": "",
+      "duration": 0,
+      "previewStart": 0,
+      "fit": "cover",
+      "span": 1,
+      "placeholder": true
+    },
+    {
+      "id": "s07",
+      "title": "Untitled",
+      "family": "",
+      "technique": "",
+      "engine": "",
+      "year": 2026,
+      "src": "",
+      "poster": "",
+      "duration": 0,
+      "previewStart": 0,
+      "fit": "cover",
+      "span": 1,
+      "placeholder": true
+    },
+    {
+      "id": "s08",
+      "title": "Untitled",
+      "family": "",
+      "technique": "",
+      "engine": "",
+      "year": 2026,
+      "src": "",
+      "poster": "",
+      "duration": 0,
+      "previewStart": 0,
+      "fit": "cover",
+      "span": 1,
+      "placeholder": true
+    },
+    {
+      "id": "s09",
+      "title": "Untitled",
+      "family": "",
+      "technique": "",
+      "engine": "",
+      "year": 2026,
+      "src": "",
+      "poster": "",
+      "duration": 0,
+      "previewStart": 0,
+      "fit": "cover",
+      "span": 1,
+      "placeholder": true
+    },
+    {
+      "id": "s10",
+      "title": "Untitled",
+      "family": "",
+      "technique": "",
+      "engine": "",
+      "year": 2026,
+      "src": "",
+      "poster": "",
+      "duration": 0,
+      "previewStart": 0,
+      "fit": "cover",
+      "span": 1,
+      "placeholder": true
+    },
+    {
+      "id": "s11",
+      "title": "Untitled",
+      "family": "",
+      "technique": "",
+      "engine": "",
+      "year": 2026,
+      "src": "",
+      "poster": "",
+      "duration": 0,
+      "previewStart": 0,
+      "fit": "cover",
+      "span": 1,
+      "placeholder": true
+    },
+    {
+      "id": "s12",
+      "title": "Untitled",
+      "family": "",
+      "technique": "",
+      "engine": "",
+      "year": 2026,
+      "src": "",
+      "poster": "",
+      "duration": 0,
+      "previewStart": 0,
+      "fit": "cover",
+      "span": 1,
+      "placeholder": true
+    },
+    {
+      "id": "s13",
+      "title": "Untitled",
+      "family": "",
+      "technique": "",
+      "engine": "",
+      "year": 2026,
+      "src": "",
+      "poster": "",
+      "duration": 0,
+      "previewStart": 0,
+      "fit": "cover",
+      "span": 1,
+      "placeholder": true
+    },
+    {
+      "id": "s14",
+      "title": "Untitled",
+      "family": "",
+      "technique": "",
+      "engine": "",
+      "year": 2026,
+      "src": "",
+      "poster": "",
+      "duration": 0,
+      "previewStart": 0,
+      "fit": "cover",
+      "span": 1,
+      "placeholder": true
+    },
+    {
+      "id": "s15",
+      "title": "Untitled",
+      "family": "",
+      "technique": "",
+      "engine": "",
+      "year": 2026,
+      "src": "",
+      "poster": "",
+      "duration": 0,
+      "previewStart": 0,
+      "fit": "cover",
+      "span": 1,
+      "placeholder": true
+    },
+    {
+      "id": "s16",
+      "title": "Untitled",
+      "family": "",
+      "technique": "",
+      "engine": "",
+      "year": 2026,
+      "src": "",
+      "poster": "",
+      "duration": 0,
+      "previewStart": 0,
+      "fit": "cover",
+      "span": 1,
+      "placeholder": true
+    }
+  ]
+}
+</script>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

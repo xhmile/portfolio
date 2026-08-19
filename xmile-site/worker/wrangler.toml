@@ -1,0 +1,12 @@
+name = "xmile-api"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+# Public base for the media bucket. Either the r2.dev URL Cloudflare gives you,
+# or your own subdomain once you attach a custom domain to the bucket.
+[vars]
+PUBLIC_BASE = "https://media.example.com"
+
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "xmile-media"
