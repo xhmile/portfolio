@@ -810,20 +810,81 @@ async function publishToWorker() {
   } catch (e) { $('#eStatus').textContent = 'publish failed: ' + e.message; }
 }
 
-/* Hand the locally-held files back, named exactly as content.json refers to
-   them, so dropping them into media/ makes the folder self-contained. */
+/* ---------- zip (STORE method, no compression, no dependency) ----------
+   Video is already compressed, so there is nothing to gain from deflating
+   it, and a tiny hand-rolled encoder keeps the "no build step" promise. */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(buf) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function u16(v) { return new Uint8Array([v & 255, (v >>> 8) & 255]); }
+function u32(v) { return new Uint8Array([v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255]); }
+function concatBytes(arrs) {
+  let len = 0; for (const a of arrs) len += a.length;
+  const out = new Uint8Array(len);
+  let o = 0; for (const a of arrs) { out.set(a, o); o += a.length; }
+  return out;
+}
+async function makeZip(entries) {
+  const now = new Date();
+  const dTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+  const dDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  const parts = [], central = [];
+  let offset = 0;
+  for (const { name, blob } of entries) {
+    const buf = new Uint8Array(await blob.arrayBuffer());
+    const crc = crc32(buf);
+    const nameBytes = new TextEncoder().encode(name);
+    const local = concatBytes([
+      u32(0x04034b50), u16(20), u16(0), u16(0), u16(dTime), u16(dDate),
+      u32(crc), u32(buf.length), u32(buf.length), u16(nameBytes.length), u16(0), nameBytes
+    ]);
+    parts.push(local, buf);
+    const localOffset = offset;
+    offset += local.length + buf.length;
+    central.push(concatBytes([
+      u32(0x02014b50), u16(20), u16(20), u16(0), u16(0), u16(dTime), u16(dDate),
+      u32(crc), u32(buf.length), u32(buf.length), u16(nameBytes.length),
+      u16(0), u16(0), u16(0), u16(0), u32(0), u32(localOffset), nameBytes
+    ]));
+  }
+  const centralBytes = concatBytes(central);
+  const eocd = concatBytes([
+    u32(0x06054b50), u16(0), u16(0), u16(entries.length), u16(entries.length),
+    u32(centralBytes.length), u32(offset), u16(0)
+  ]);
+  return new Blob([...parts, centralBytes, eocd], { type: 'application/zip' });
+}
+
+/* One zip: content/content.json plus every video, each named with the exact
+   relative path the site expects — unzip straight on top of the project
+   folder and everything lands where it belongs. */
 async function downloadMedia() {
   const files = await idb.all();
-  if (!files.length) { toast('Nothing stored locally yet'); return; }
-  for (const [key, blob] of files) {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = key.split('/').pop();
-    a.click();
-    await new Promise(r => setTimeout(r, 400));   // browsers throttle bursts
-    URL.revokeObjectURL(a.href);
-  }
-  toast('Put these into the media folder, keeping the names');
+  const entries = [{
+    name: 'content/content.json',
+    blob: new Blob([JSON.stringify(DATA, null, 2)], { type: 'application/json' })
+  }];
+  for (const [key, blob] of files) entries.push({ name: key, blob });
+
+  toast('Zipping…');
+  const zip = await makeZip(entries);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(zip);
+  a.download = 'xmile-export.zip';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('Unzip on top of the xmile-site folder — done');
 }
 
 function exportJson() {
