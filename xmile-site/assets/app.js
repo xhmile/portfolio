@@ -19,7 +19,7 @@ const CONFIG = {
   //   BACKEND — a Cloudflare Worker, used for uploading video into R2.
   // Either can be empty. With both empty everything still works locally.
   GITHUB: {
-    repo:   '',                       // 'xmile/portfolio'
+    repo:   'xhmile/portfolio',
     branch: 'main',
     path:   'content/content.json'
   },
