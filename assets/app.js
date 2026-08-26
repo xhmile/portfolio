@@ -685,7 +685,11 @@ async function put(name, blob, onProgress) {
     // so the published site serves it and nothing has to be uploaded by hand.
     if (ghRepo()) {
       if (blob.size > GH_MAX_BYTES) {
-        throw new Error(`file is ${(blob.size / 1048576).toFixed(0)} MB — export under 45 MB`);
+        throw new Error(
+          `${(blob.size / 1048576).toFixed(0)} MB is over the 45 MB limit. ` +
+          `Re-export H.264 capped at 8000 kbps — that is roughly 1 MB per second, ` +
+          `so anything under 45 seconds fits.`
+        );
       }
       await putToGithub(path, blob, onProgress);
       return path;
