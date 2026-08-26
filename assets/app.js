@@ -590,13 +590,23 @@ function setRanges(dur, hoverAt) {
 }
 function seekPreview(t) { const dv = $('#dv'); try { dv.currentTime = t; } catch (e) {} }
 
+/* Drawing a cross-origin video onto a canvas taints it, and toBlob() then
+   throws. That happens whenever a work already stored on the media host is
+   reopened, so a failure here must not take the whole save down with it —
+   the existing poster simply stands. */
 function grabPoster() {
   const dv = $('#dv');
   if (!dv.videoWidth) return Promise.resolve(null);
-  const W = 720, H = Math.round(W * dv.videoHeight / dv.videoWidth);
-  const c = document.createElement('canvas'); c.width = W; c.height = H;
-  c.getContext('2d').drawImage(dv, 0, 0, W, H);
-  return new Promise(res => c.toBlob(b => res(b), 'image/jpeg', .84));
+  try {
+    const W = 720, H = Math.round(W * dv.videoHeight / dv.videoWidth);
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    c.getContext('2d').drawImage(dv, 0, 0, W, H);
+    return new Promise(res => {
+      try { c.toBlob(b => res(b), 'image/jpeg', .84); } catch (e) { res(null); }
+    });
+  } catch (e) {
+    return Promise.resolve(null);
+  }
 }
 
 function closeDlg() { $('#dlg').classList.remove('open'); dlgWork = null; dlgFile = null; }

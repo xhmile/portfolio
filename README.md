@@ -119,11 +119,14 @@ Pages site should stay under 1 GB.
 
 ### If the archive ever outgrows that
 
-Video moves to object storage and only then does a backend earn its place. The
-Worker in `worker/` does exactly that against Cloudflare R2 — deploy it, put
-its URL in `CONFIG.BACKEND` and the bucket URL in `CONFIG.MEDIA_BASE`, and
-uploads go there instead. Until the size actually hurts, it is a moving part
-that buys nothing.
+Video moves to object storage. The Worker in `worker/` does exactly that
+against Cloudflare R2: deploy it and put its URL in `CONFIG.BACKEND`.
+
+Leave `CONFIG.MEDIA_BASE` empty. The Worker hands back a full URL for every
+file it stores, so uploads carry their own address, while anything already
+committed to `media/` keeps resolving against the site itself. Setting
+`MEDIA_BASE` would prefix those repository paths too and break them. The two
+storage locations coexist precisely because that field is blank.
 
 ## Why not Google Drive
 
