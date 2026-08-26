@@ -73,9 +73,11 @@ slot. A file the browser cannot decode leaves the poster in place. A missing
   in place. Click the text and type.
 - **Replace the hero video** — the button in the bottom bar.
 
-Without a backend configured, edits live in your browser only and
-`Download content.json` gives you the file to drop into `content/`. That is
-enough to work offline and it is a real fallback if anything else fails.
+With the repository configured — it already is — every upload is committed
+straight into it and **Save** publishes `content.json`. Nothing is uploaded by
+hand. Opened from a local folder with no token entered, edits stay in the
+browser and `Download everything (.zip)` gives you the whole thing back, which
+is the offline fallback if anything else fails.
 
 ### Export settings that matter
 
@@ -88,55 +90,40 @@ quality this design needs.
 
 ## Publishing
 
-### 1. The site → Cloudflare Pages (free)
+The site is served by **GitHub Pages** from the root of this repository, on the
+domain in `CNAME`. There is nothing to build and no third-party service in the
+path.
 
-Push this folder to a GitHub repo, then in the Cloudflare dashboard:
-Workers & Pages → Create → Pages → connect the repo. Framework preset
-**None**, build command **empty**, output directory `/`. Every push redeploys.
+### How a change reaches the live site
 
-Cloudflare Pages caps a single file at **25 MiB**, which is why video does not
-live here — it lives in R2.
+Open `https://<your-domain>/?edit`, from a laptop or a phone. The first upload
+asks once for a GitHub token with **Contents: read and write** on this
+repository; the browser keeps it and never asks again.
 
-### 2. Video → Cloudflare R2
+- **A video** is committed to `media/` the moment you pick it.
+- **Save** commits `content/content.json`.
 
-```bash
-npm i -g wrangler
-wrangler login
-wrangler r2 bucket create xmile-media
-```
+Pages rebuilds within about half a minute. Nothing is downloaded, sorted into
+folders, or re-uploaded by hand.
 
-In the dashboard, open the bucket → Settings → attach a custom domain
-(`media.yourdomain.com`) or switch on the r2.dev public URL. R2 charges about
-**$0.015 per GB per month** for storage and nothing for traffic out, so
-sixteen pieces at 20 MB each costs well under a dollar a month.
+The token lives in that one browser and goes nowhere else. Treat it like a
+password: if it is ever pasted anywhere public, revoke it at
+`github.com/settings/tokens` and let the editor ask for a new one.
 
-### 3. The editor backend → a Worker
+### Size
 
-```bash
-cd worker
-# put your public media URL into wrangler.toml first
-wrangler secret put EDITOR_KEY     # this becomes your editor password
-wrangler deploy
-```
+GitHub refuses a single file over 100 MB, and the editor stops at **45 MB** so
+an upload fails up front instead of halfway. At the export settings below that
+is roughly 45 seconds of video, which is longer than any tile needs. A whole
+Pages site should stay under 1 GB.
 
-Then open `assets/app.js` and fill in the two lines at the top:
+### If the archive ever outgrows that
 
-```js
-const CONFIG = {
-  BACKEND: 'https://xmile-api.<you>.workers.dev',
-  MEDIA_BASE: 'https://media.yourdomain.com/',
-  ...
-```
-
-Now `?edit` uploads straight to R2 and **Save** publishes for everyone. The
-Worker keeps a timestamped copy of the previous `content.json` under
-`backups/` on every save, so a bad edit is always one file away from undo.
-
-The public site never calls the Worker. If the Worker breaks, is
-misconfigured, or you delete it outright, visitors still get the site exactly
-as it was.
-
----
+Video moves to object storage and only then does a backend earn its place. The
+Worker in `worker/` does exactly that against Cloudflare R2 — deploy it, put
+its URL in `CONFIG.BACKEND` and the bucket URL in `CONFIG.MEDIA_BASE`, and
+uploads go there instead. Until the size actually hurts, it is a moving part
+that buys nothing.
 
 ## Why not Google Drive
 
@@ -152,7 +139,8 @@ correct tool, and R2 is the cheap version of it.
 ## Layout of the folder
 
 ```
-index.html              the page
+index.html              the page (served from the repository root)
+CNAME                   the domain GitHub Pages answers on
 assets/style.css        all styling
 assets/app.js           site + editor, with CONFIG at the very top
 assets/fonts.css        self-hosted Inter and JetBrains Mono

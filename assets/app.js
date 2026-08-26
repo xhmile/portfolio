@@ -661,18 +661,37 @@ async function uploadHero(file) {
    Without one: keep the file in this browser session so you can see the
    result immediately, and warn that it is not published.
 ------------------------------- */
+/* GitHub's contents API refuses very large files, and base64 inflates a
+   file by a third on the way there. Stay well inside the limit and say so
+   plainly rather than letting the upload fail halfway. */
+const GH_MAX_BYTES = 45 * 1024 * 1024;
+
 async function put(name, blob, onProgress) {
   const path = 'media/' + name;
 
   if (!CONFIG.BACKEND) {
     // Posters are tiny — inline them, so content.json alone shows the wall.
     if (/\.(jpg|png)$/i.test(name)) { if (onProgress) onProgress(100); return await blobToDataUrl(blob); }
-    // Video goes into IndexedDB under the same path the deployed site uses,
-    // so it survives a reload and content.json stays deploy-ready.
+
+    // Keep a local copy first: the tile plays immediately, and the draft
+    // survives a reload even if the commit below never happens.
     const ok = await idb.put(path, blob);
+    if (ok) {
+      const old = BLOBS.get(path); if (old) URL.revokeObjectURL(old);
+      BLOBS.set(path, URL.createObjectURL(blob));
+    }
+
+    // With a repository configured, the video is committed straight into it,
+    // so the published site serves it and nothing has to be uploaded by hand.
+    if (ghRepo()) {
+      if (blob.size > GH_MAX_BYTES) {
+        throw new Error(`file is ${(blob.size / 1048576).toFixed(0)} MB — export under 45 MB`);
+      }
+      await putToGithub(path, blob, onProgress);
+      return path;
+    }
+
     if (!ok) { toast('Browser refused to store the file'); return URL.createObjectURL(blob); }
-    const old = BLOBS.get(path); if (old) URL.revokeObjectURL(old);
-    BLOBS.set(path, URL.createObjectURL(blob));
     if (onProgress) onProgress(100);
     return path;
   }
@@ -794,6 +813,53 @@ function b64utf8(str) {
   let bin = '';
   bytes.forEach(b => bin += String.fromCharCode(b));
   return btoa(bin);
+}
+
+/* String.fromCharCode(...bytes) blows the call stack on anything video-sized,
+   so walk the buffer in chunks. */
+async function b64binary(blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const CHUNK = 0x8000;
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(bin);
+}
+
+/* Commit one media file into the repository. The published site then serves
+   it from its own origin, which is why src stays a plain relative path. */
+async function putToGithub(path, blob, onProgress) {
+  const { branch } = CONFIG.GITHUB;
+  if (onProgress) onProgress(5);
+
+  // GitHub needs the current sha to overwrite an existing file.
+  let sha = null;
+  const cur = await gh.api(`/contents/${path}?ref=${branch}`);
+  if (cur.ok) sha = (await cur.json()).sha;
+  else if (cur.status === 401 || cur.status === 403) {
+    store.del('xmile:gh');
+    throw new Error('token rejected — it was cleared, try again');
+  }
+
+  const content = await b64binary(blob);
+  if (onProgress) onProgress(40);
+
+  const r = await gh.api(`/contents/${path}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      message: 'media: ' + path.split('/').pop(),
+      content,
+      branch,
+      ...(sha ? { sha } : {})
+    })
+  });
+  if (!r.ok) {
+    let msg = r.status;
+    try { msg = (await r.json()).message || msg; } catch (e) {}
+    throw new Error(String(msg));
+  }
+  if (onProgress) onProgress(100);
 }
 
 async function publishToWorker() {
