@@ -739,17 +739,12 @@ function xhrPut(u, blob, onProgress) {
     x.send(blob);
   });
 }
-/* Two different credentials are in play and they are easy to confuse, so the
-   prompt says which one this is and which one it is not. */
+/* Credentials are entered once on admin.html and only read here. Prompting
+   mid-action asked for the wrong one at the worst moment and gave nowhere to
+   correct it; sending the person to the panel does both. */
 function token() {
-  let t = store.get('xmile:token');
-  if (!t) {
-    t = prompt(
-      'Media upload password — the EDITOR_KEY you set on the Cloudflare Worker.\n\n' +
-      'This is NOT your GitHub token. Both can be managed on admin.html.'
-    ) || '';
-    if (t) store.set('xmile:token', t);
-  }
+  const t = store.get('xmile:token');
+  if (!t) throw new Error('media password not set — open admin.html and fill in section 2');
   return t;
 }
 
@@ -777,12 +772,9 @@ const gh = {
   })
 };
 function ghToken() {
-  let t = store.get('xmile:gh');
-  if (!t) {
-    t = prompt('GitHub token (Contents: read and write on this repo)') || '';
-    if (t) store.set('xmile:gh', t.trim());
-  }
-  return (t || '').trim();
+  const t = (store.get('xmile:gh') || '').trim();
+  if (!t) throw new Error('GitHub token not set — open admin.html and fill in section 1');
+  return t;
 }
 
 /* Asked for once and remembered, so nobody has to edit a config file. */
@@ -806,9 +798,15 @@ async function publishToGithub() {
     let sha = null;
     const cur = await gh.api(`/contents/${path}?ref=${branch}`);
     if (cur.ok) sha = (await cur.json()).sha;
-    else if (cur.status === 401 || cur.status === 403) {
+    // Only 401 means the credential itself is bad. GitHub also answers 403 for
+    // rate limiting and for a token whose scope is too narrow — discarding a
+    // working key over either of those is worse than reporting it.
+    else if (cur.status === 401) {
       store.del('xmile:gh');
-      throw new Error('token rejected — it was cleared, press Save again');
+      throw new Error('token rejected — set a new one on admin.html');
+    }
+    else if (cur.status === 403) {
+      throw new Error('github refused (403) — rate limit, or the token lacks Contents: write');
     }
 
     const body = JSON.stringify(DATA, null, 2);
@@ -862,9 +860,12 @@ async function putToGithub(path, blob, onProgress) {
   let sha = null;
   const cur = await gh.api(`/contents/${path}?ref=${branch}`);
   if (cur.ok) sha = (await cur.json()).sha;
-  else if (cur.status === 401 || cur.status === 403) {
+  else if (cur.status === 401) {
     store.del('xmile:gh');
-    throw new Error('token rejected — it was cleared, try again');
+    throw new Error('token rejected — set a new one on admin.html');
+  }
+  else if (cur.status === 403) {
+    throw new Error('github refused (403) — rate limit, or the token lacks Contents: write');
   }
 
   const content = await b64binary(blob);

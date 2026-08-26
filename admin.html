@@ -124,7 +124,8 @@ Cloudflare заливает видео. Перепутать их — обычн
 <script>
 (() => {
 'use strict';
-const REPO = 'xhmile/portfolio';
+const REPO    = 'xhmile/portfolio';
+const BACKEND = 'https://xmile-api.djvossss.workers.dev';
 const KEY  = 'xmile:gh';      // GitHub token — publishes content.json
 const PWD  = 'xmile:token';   // EDITOR_KEY  — uploads video to the Worker
 const $ = s => document.querySelector(s);
@@ -201,16 +202,34 @@ $('#clear').onclick = () => {
   paint();
 };
 
-$('#savePwd').onclick = () => {
+/* Ask the Worker to sign an upload. It answers without storing anything, so
+   this proves the password before a real upload depends on it. */
+async function verifyPwd(p) {
+  try {
+    const r = await fetch(BACKEND + '/sign?key=' + encodeURIComponent('media/.probe.mp4'), {
+      headers: { 'x-xmile-key': p }
+    });
+    if (r.status === 401) return 'пароль отклонён воркером';
+    if (!r.ok) return 'воркер ответил ошибкой ' + r.status;
+    return null;
+  } catch (e) {
+    return 'воркер недоступен — проверьте, что он развёрнут';
+  }
+}
+
+$('#savePwd').onclick = async () => {
   const p = $('#pwd').value.trim();
   if (!p) { $('#msgPwd').textContent = 'введите пароль'; return; }
   if (/^(github_pat_|ghp_|gho_|ghs_)/.test(p)) {
     $('#msgPwd').textContent = 'это токен GitHub — он идёт в поле выше, а сюда нужен EDITOR_KEY';
     return;
   }
+  $('#msgPwd').textContent = 'проверяю…';
+  const bad = await verifyPwd(p);
+  if (bad) { $('#msgPwd').textContent = bad + ' — не сохранён'; return; }
   if (!store.set(PWD, p)) { $('#msgPwd').textContent = 'браузер отказался сохранить'; return; }
   $('#pwd').value = '';
-  $('#msgPwd').textContent = 'сохранено — можно заливать видео';
+  $('#msgPwd').textContent = 'проверен и сохранён — можно заливать видео';
   paint();
 };
 
