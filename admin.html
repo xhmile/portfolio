@@ -1,0 +1,179 @@
+<!DOCTYPE html><html lang="ru"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>XMILE — админка</title>
+<link rel="stylesheet" href="assets/fonts.css">
+<style>
+:root{--bg:#0A0A0A;--fg:#E4E4E2;--dim:#6D6D6A;--line:rgba(228,228,226,.11);
+      --ok:#7FBF7F;--bad:#D98A7A;--warn:#C9B37E}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+     font:14px/1.6 Inter,system-ui,sans-serif;padding:32px 20px 80px}
+.wrap{max-width:620px;margin:0 auto}
+h1{font:500 13px/1 JB,ui-monospace,monospace;letter-spacing:.18em;
+   text-transform:uppercase;color:var(--dim);margin:0 0 28px}
+h2{font:500 15px/1.4 Inter,sans-serif;margin:34px 0 10px}
+p{margin:0 0 12px;color:var(--dim)}
+p.lead{color:var(--fg)}
+.card{border:1px solid var(--line);padding:18px;margin:0 0 18px}
+.row{display:flex;align-items:center;gap:10px;margin:0 0 10px;flex-wrap:wrap}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--dim)}
+.dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
+.k{font:400 12px/1.5 JB,ui-monospace,monospace;color:var(--dim);min-width:104px}
+.v{font:400 12px/1.5 JB,ui-monospace,monospace;word-break:break-all}
+input[type=password],input[type=text]{
+  width:100%;background:#141414;border:1px solid var(--line);color:var(--fg);
+  padding:11px 12px;font:400 13px/1.4 JB,ui-monospace,monospace}
+input:focus{outline:none;border-color:rgba(228,228,226,.35)}
+button{background:transparent;border:1px solid var(--line);color:var(--fg);
+  padding:11px 16px;font:400 12px/1 JB,ui-monospace,monospace;letter-spacing:.06em;
+  cursor:pointer;transition:border-color .15s,background .15s}
+button:hover{border-color:rgba(228,228,226,.4);background:rgba(228,228,226,.04)}
+button.primary{border-color:rgba(228,228,226,.45)}
+button.primary:hover{background:rgba(228,228,226,.09)}
+button:disabled{opacity:.4;cursor:default}
+.btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+a{color:var(--fg)}
+code{font:400 12px JB,ui-monospace,monospace;background:#161616;padding:2px 5px}
+ol{color:var(--dim);padding-left:20px;margin:0 0 12px}
+ol li{margin:0 0 8px}
+.note{border-left:2px solid var(--line);padding:2px 0 2px 14px;margin:14px 0;
+      font-size:13px;color:var(--dim)}
+.enter{display:block;width:100%;text-align:center;padding:18px;margin:26px 0 0;
+  border:1px solid rgba(228,228,226,.45);text-decoration:none;
+  font:400 13px/1 JB,ui-monospace,monospace;letter-spacing:.1em;text-transform:uppercase}
+.enter:hover{background:rgba(228,228,226,.09)}
+.enter.off{opacity:.45;pointer-events:none}
+#msg{font:400 12px/1.5 JB,ui-monospace,monospace;margin-top:12px;min-height:18px}
+</style></head><body>
+<div class="wrap">
+
+<h1>XMILE · панель управления</h1>
+
+<p class="lead">Отсюда вы загружаете видео и правите тексты. Всё сохраняется прямо
+в репозиторий и попадает на сайт через полминуты.</p>
+
+<div class="card">
+  <div class="row"><span class="dot" id="dRepo"></span><span class="k">репозиторий</span><span class="v" id="vRepo">—</span></div>
+  <div class="row"><span class="dot" id="dTok"></span><span class="k">токен</span><span class="v" id="vTok">—</span></div>
+  <div class="row"><span class="dot" id="dNet"></span><span class="k">доступ</span><span class="v" id="vNet">не проверен</span></div>
+</div>
+
+<h2>Ключ доступа</h2>
+<p>Токен GitHub с правом <code>Contents: read and write</code>. Хранится только
+в этом браузере — на сервер не уходит и никому не показывается.</p>
+
+<input type="password" id="tok" placeholder="github_pat_… или ghp_…" autocomplete="off" spellcheck="false">
+<div class="btns">
+  <button class="primary" id="save">Сохранить и проверить</button>
+  <button id="clear">Удалить ключ</button>
+</div>
+<div id="msg"></div>
+
+<a class="enter off" id="enter" href="index.html?edit">Открыть редактор</a>
+
+<h2>Если ключа ещё нет</h2>
+<ol>
+  <li>Откройте <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">страницу создания токена</a>.</li>
+  <li><b>Repository access</b> → Only select repositories → выберите <code>portfolio</code>.</li>
+  <li><b>Permissions</b> → Repository permissions → <b>Contents</b> → <code>Read and write</code>.</li>
+  <li>Срок действия — на ваше усмотрение. Когда истечёт, просто создайте новый и вставьте сюда.</li>
+  <li>Скопируйте ключ и вставьте в поле выше. Показывается он один раз.</li>
+</ol>
+
+<div class="note">
+Ключ — это и есть настоящая защита. Страница лежит в публичном репозитории,
+поэтому её адрес не является секретом: любой может её открыть. Но без ключа
+он не сможет ничего опубликовать — правки останутся в его собственном браузере
+и никого, кроме него, не коснутся. Не вставляйте ключ на чужом компьютере
+и не пересылайте его в переписке. Если он всё-таки куда-то попал —
+<a href="https://github.com/settings/tokens" target="_blank" rel="noopener">отзовите</a>
+и создайте новый.
+</div>
+
+<h2>Как это работает</h2>
+<ol>
+  <li>Нажмите <b>Открыть редактор</b>.</li>
+  <li>Плюсик на пустой ячейке — выберите видео. Оно сразу уходит в репозиторий.</li>
+  <li>Тексты правятся прямо на странице — кликните и печатайте.</li>
+  <li><b>Save</b> в нижней панели — и сайт обновился для всех.</li>
+</ol>
+<p>Работает с ноутбука и с телефона одинаково. Ничего скачивать и раскладывать
+по папкам не нужно. Размер одного видео — до 45 МБ.</p>
+
+<script>
+(() => {
+'use strict';
+const REPO = 'xhmile/portfolio';
+const KEY  = 'xmile:gh';
+const $ = s => document.querySelector(s);
+
+const store = {
+  get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
+  set(k,v){ try { localStorage.setItem(k,v); return true; } catch(e){ return false; } },
+  del(k){ try { localStorage.removeItem(k); } catch(e){} }
+};
+
+function mark(dot, state){ $(dot).className = 'dot' + (state ? ' ' + state : ''); }
+function mask(t){ return t.length < 12 ? '••••' : t.slice(0,7) + '…' + t.slice(-4); }
+
+function paint(){
+  $('#vRepo').textContent = REPO;
+  mark('#dRepo','ok');
+
+  const t = store.get(KEY);
+  if (t) { $('#vTok').textContent = 'сохранён · ' + mask(t); mark('#dTok','ok'); }
+  else   { $('#vTok').textContent = 'не задан';               mark('#dTok','bad'); }
+
+  $('#enter').classList.toggle('off', !t);
+  return t;
+}
+
+/* A token that cannot write is worse than no token: the failure would only
+   surface halfway through an upload. So check the actual permission now. */
+async function verify(t){
+  $('#vNet').textContent = 'проверяю…'; mark('#dNet','warn');
+  try {
+    const r = await fetch('https://api.github.com/repos/' + REPO, {
+      headers: { accept:'application/vnd.github+json', authorization:'Bearer ' + t }
+    });
+    if (r.status === 401) { $('#vNet').textContent = 'ключ отклонён'; mark('#dNet','bad'); return false; }
+    if (!r.ok)            { $('#vNet').textContent = 'ошибка ' + r.status; mark('#dNet','bad'); return false; }
+    const j = await r.json();
+    if (j.permissions && j.permissions.push) {
+      $('#vNet').textContent = 'запись разрешена'; mark('#dNet','ok'); return true;
+    }
+    $('#vNet').textContent = 'только чтение — нужен Contents: read and write';
+    mark('#dNet','bad'); return false;
+  } catch (e) {
+    $('#vNet').textContent = 'сеть недоступна'; mark('#dNet','bad'); return false;
+  }
+}
+
+$('#save').onclick = async () => {
+  const t = $('#tok').value.trim();
+  if (!t) { $('#msg').textContent = 'вставьте ключ в поле выше'; return; }
+  if (!store.set(KEY, t)) {
+    $('#msg').textContent = 'браузер отказался сохранить ключ — проверьте настройки приватности';
+    return;
+  }
+  $('#tok').value = '';
+  paint();
+  const ok = await verify(t);
+  $('#msg').textContent = ok ? 'готово — можно открывать редактор'
+                             : 'ключ сохранён, но записывать им нельзя — см. строку «доступ»';
+};
+
+$('#clear').onclick = () => {
+  store.del(KEY);
+  $('#vNet').textContent = 'не проверен'; mark('#dNet','');
+  $('#msg').textContent = 'ключ удалён из этого браузера';
+  paint();
+};
+
+const existing = paint();
+if (existing) verify(existing);
+})();
+</script>
+</div></body></html>
