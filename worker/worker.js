@@ -25,6 +25,16 @@ const CORS = origin => ({
   'access-control-max-age': '86400'
 });
 
+/* A missing binding otherwise surfaces as Cloudflare error 1101 — "Worker
+   threw exception" — which says nothing about what to fix. Name it instead. */
+function missingConfig(env) {
+  const missing = [];
+  if (!env.MEDIA)       missing.push('R2 bucket binding "MEDIA" → bucket xmile-media');
+  if (!env.PUBLIC_BASE) missing.push('Text variable "PUBLIC_BASE" → the bucket\'s public URL');
+  if (!env.EDITOR_KEY)  missing.push('Secret "EDITOR_KEY" → the editor password');
+  return missing;
+}
+
 export default {
   async fetch(req, env) {
     const u = new URL(req.url);
@@ -32,6 +42,15 @@ export default {
     const cors = CORS(origin);
 
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+
+    const missing = missingConfig(env);
+    if (missing.length) {
+      return json({
+        error: 'worker is not configured',
+        missing,
+        fix: 'Cloudflare dashboard → this Worker → Settings → Bindings, then Deploy'
+      }, 500, cors);
+    }
 
     // ---- read content.json (public) ----
     if (u.pathname === '/content' && req.method === 'GET') {
