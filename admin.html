@@ -58,18 +58,37 @@ ol li{margin:0 0 8px}
   <div class="row"><span class="dot" id="dRepo"></span><span class="k">репозиторий</span><span class="v" id="vRepo">—</span></div>
   <div class="row"><span class="dot" id="dTok"></span><span class="k">токен</span><span class="v" id="vTok">—</span></div>
   <div class="row"><span class="dot" id="dNet"></span><span class="k">доступ</span><span class="v" id="vNet">не проверен</span></div>
+  <div class="row"><span class="dot" id="dPwd"></span><span class="k">пароль видео</span><span class="v" id="vPwd">—</span></div>
 </div>
 
-<h2>Ключ доступа</h2>
-<p>Токен GitHub с правом <code>Contents: read and write</code>. Хранится только
-в этом браузере — на сервер не уходит и никому не показывается.</p>
+<div class="note">
+Ключа два, и они <b>разные</b>. Токен GitHub сохраняет тексты, пароль
+Cloudflare заливает видео. Перепутать их — обычное дело: попадёте на
+ошибку <code>401</code>. Каждый меняется отдельно, ниже.
+</div>
+
+<h2>1 · Токен GitHub — для текстов</h2>
+<p>Начинается на <code>github_pat_</code> или <code>ghp_</code>. Право
+<code>Contents: read and write</code>. Хранится только в этом браузере.</p>
 
 <input type="password" id="tok" placeholder="github_pat_… или ghp_…" autocomplete="off" spellcheck="false">
 <div class="btns">
   <button class="primary" id="save">Сохранить и проверить</button>
-  <button id="clear">Удалить ключ</button>
+  <button id="clear">Удалить</button>
 </div>
 <div id="msg"></div>
+
+<h2>2 · Пароль Cloudflare — для видео</h2>
+<p>Тот самый <code>EDITOR_KEY</code>, который вы придумали в настройках
+воркера. Это <b>не</b> токен GitHub. Если при загрузке видео выдаёт
+<code>401</code> — здесь он неверный, сотрите и введите заново.</p>
+
+<input type="password" id="pwd" placeholder="EDITOR_KEY с воркера" autocomplete="off" spellcheck="false">
+<div class="btns">
+  <button class="primary" id="savePwd">Сохранить</button>
+  <button id="clearPwd">Удалить</button>
+</div>
+<div id="msgPwd"></div>
 
 <a class="enter off" id="enter" href="index.html?edit">Открыть редактор</a>
 
@@ -106,7 +125,8 @@ ol li{margin:0 0 8px}
 (() => {
 'use strict';
 const REPO = 'xhmile/portfolio';
-const KEY  = 'xmile:gh';
+const KEY  = 'xmile:gh';      // GitHub token — publishes content.json
+const PWD  = 'xmile:token';   // EDITOR_KEY  — uploads video to the Worker
 const $ = s => document.querySelector(s);
 
 const store = {
@@ -125,6 +145,15 @@ function paint(){
   const t = store.get(KEY);
   if (t) { $('#vTok').textContent = 'сохранён · ' + mask(t); mark('#dTok','ok'); }
   else   { $('#vTok').textContent = 'не задан';               mark('#dTok','bad'); }
+
+  /* A GitHub token pasted into the media password is the mistake this panel
+     exists to catch, so name it rather than just reporting "saved". */
+  const p = store.get(PWD);
+  if (!p) { $('#vPwd').textContent = 'не задан'; mark('#dPwd','warn'); }
+  else if (/^(github_pat_|ghp_|gho_|ghs_)/.test(p)) {
+    $('#vPwd').textContent = 'это токен GitHub, а не пароль — сотрите';
+    mark('#dPwd','bad');
+  } else { $('#vPwd').textContent = 'задан · ' + mask(p); mark('#dPwd','ok'); }
 
   $('#enter').classList.toggle('off', !t);
   return t;
@@ -169,6 +198,25 @@ $('#clear').onclick = () => {
   store.del(KEY);
   $('#vNet').textContent = 'не проверен'; mark('#dNet','');
   $('#msg').textContent = 'ключ удалён из этого браузера';
+  paint();
+};
+
+$('#savePwd').onclick = () => {
+  const p = $('#pwd').value.trim();
+  if (!p) { $('#msgPwd').textContent = 'введите пароль'; return; }
+  if (/^(github_pat_|ghp_|gho_|ghs_)/.test(p)) {
+    $('#msgPwd').textContent = 'это токен GitHub — он идёт в поле выше, а сюда нужен EDITOR_KEY';
+    return;
+  }
+  if (!store.set(PWD, p)) { $('#msgPwd').textContent = 'браузер отказался сохранить'; return; }
+  $('#pwd').value = '';
+  $('#msgPwd').textContent = 'сохранено — можно заливать видео';
+  paint();
+};
+
+$('#clearPwd').onclick = () => {
+  store.del(PWD);
+  $('#msgPwd').textContent = 'пароль удалён — редактор спросит его при следующей загрузке';
   paint();
 };
 

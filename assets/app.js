@@ -739,9 +739,17 @@ function xhrPut(u, blob, onProgress) {
     x.send(blob);
   });
 }
+/* Two different credentials are in play and they are easy to confuse, so the
+   prompt says which one this is and which one it is not. */
 function token() {
   let t = store.get('xmile:token');
-  if (!t) { t = prompt('Editor password') || ''; store.set('xmile:token', t); }
+  if (!t) {
+    t = prompt(
+      'Media upload password — the EDITOR_KEY you set on the Cloudflare Worker.\n\n' +
+      'This is NOT your GitHub token. Both can be managed on admin.html.'
+    ) || '';
+    if (t) store.set('xmile:token', t);
+  }
   return t;
 }
 
