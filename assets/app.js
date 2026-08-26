@@ -23,8 +23,11 @@ const CONFIG = {
     branch: 'main',
     path:   'content/content.json'
   },
-  BACKEND: '',            // 'https://xmile-api.<you>.workers.dev'
-  MEDIA_BASE: '',         // 'https://pub-xxxxx.r2.dev/'  — where video lives
+  BACKEND: 'https://xmile-api.djvossss.workers.dev',
+  // Deliberately empty: the Worker returns a full URL for everything it
+  // stores, so uploads carry their own address. Filling this in would also
+  // prefix the paths already committed under media/ and break them.
+  MEDIA_BASE: '',
   HOVER_DELAY: 90,        // ms before a hovered tile starts
   FADE: 260               // ms audio fade
 };
