@@ -61,6 +61,23 @@ export default {
       });
     }
 
+    // ---- receive the upload ----
+    // Carries its key in the query string, because the browser sends the body
+    // through XMLHttpRequest where a header is awkward to attach. It therefore
+    // has to be matched before the header gate below, or it can never pass.
+    if (u.pathname === '/upload' && req.method === 'PUT') {
+      if (u.searchParams.get('t') !== env.EDITOR_KEY) return json({ error: 'unauthorized' }, 401, cors);
+      const objKey = u.searchParams.get('key') || '';
+      if (!/^media\/[A-Za-z0-9._\/-]+$/.test(objKey)) return json({ error: 'bad key' }, 400, cors);
+      const type = objKey.endsWith('.jpg') ? 'image/jpeg'
+        : objKey.endsWith('.png') ? 'image/png'
+        : objKey.endsWith('.webm') ? 'video/webm' : 'video/mp4';
+      await env.MEDIA.put(objKey, req.body, {
+        httpMetadata: { contentType: type, cacheControl: 'public, max-age=31536000, immutable' }
+      });
+      return json({ ok: true, key: objKey }, 200, cors);
+    }
+
     // ---- everything below needs the editor key ----
     const key = req.headers.get('x-xmile-key');
     if (!env.EDITOR_KEY || key !== env.EDITOR_KEY) return json({ error: 'unauthorized' }, 401, cors);
@@ -87,20 +104,6 @@ export default {
       const uploadUrl = `${u.origin}/upload?key=${encodeURIComponent(objKey)}&t=${encodeURIComponent(key)}`;
       const publicUrl = `${env.PUBLIC_BASE.replace(/\/$/, '')}/${objKey}`;
       return json({ uploadUrl, publicUrl }, 200, cors);
-    }
-
-    // ---- receive the upload ----
-    if (u.pathname === '/upload' && req.method === 'PUT') {
-      if (u.searchParams.get('t') !== env.EDITOR_KEY) return json({ error: 'unauthorized' }, 401, cors);
-      const objKey = u.searchParams.get('key') || '';
-      if (!/^media\/[A-Za-z0-9._\/-]+$/.test(objKey)) return json({ error: 'bad key' }, 400, cors);
-      const type = objKey.endsWith('.jpg') ? 'image/jpeg'
-        : objKey.endsWith('.png') ? 'image/png'
-        : objKey.endsWith('.webm') ? 'video/webm' : 'video/mp4';
-      await env.MEDIA.put(objKey, req.body, {
-        httpMetadata: { contentType: type, cacheControl: 'public, max-age=31536000, immutable' }
-      });
-      return json({ ok: true, key: objKey }, 200, cors);
     }
 
     return json({ error: 'not found' }, 404, cors);

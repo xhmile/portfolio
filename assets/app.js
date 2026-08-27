@@ -733,6 +733,10 @@ function xhrPut(u, blob, onProgress) {
   return new Promise((res, rej) => {
     const x = new XMLHttpRequest();
     x.open('PUT', u);
+    // The upload URL already carries the key as a query parameter, but the
+    // Worker gates every route on the header before the upload route gets to
+    // read that parameter. Send both so either check is satisfied.
+    x.setRequestHeader('x-xmile-key', token());
     x.upload.onprogress = e => { if (e.lengthComputable && onProgress) onProgress(Math.round(e.loaded / e.total * 100)); };
     x.onload = () => (x.status < 300 ? res() : rej(new Error('put ' + x.status)));
     x.onerror = () => rej(new Error('network'));
