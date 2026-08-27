@@ -160,21 +160,34 @@ function paint(){
   return t;
 }
 
-/* A token that cannot write is worse than no token: the failure would only
-   surface halfway through an upload. So check the actual permission now. */
+/* The repository's own "permissions" block reports what the account may do,
+   not what this token may do, so a fine-grained token missing Contents write
+   still looks writable there — and the first Save is where it surfaces.
+   Writing a loose blob is the cheapest thing that genuinely needs that
+   permission: it creates no commit, belongs to no tree, appears nowhere in
+   the repository, and is collected as garbage. */
 async function verify(t){
   $('#vNet').textContent = 'проверяю…'; mark('#dNet','warn');
+  const head = { accept:'application/vnd.github+json', authorization:'Bearer ' + t };
   try {
-    const r = await fetch('https://api.github.com/repos/' + REPO, {
-      headers: { accept:'application/vnd.github+json', authorization:'Bearer ' + t }
-    });
+    const r = await fetch('https://api.github.com/repos/' + REPO, { headers: head });
     if (r.status === 401) { $('#vNet').textContent = 'ключ отклонён'; mark('#dNet','bad'); return false; }
-    if (!r.ok)            { $('#vNet').textContent = 'ошибка ' + r.status; mark('#dNet','bad'); return false; }
-    const j = await r.json();
-    if (j.permissions && j.permissions.push) {
-      $('#vNet').textContent = 'запись разрешена'; mark('#dNet','ok'); return true;
+    if (r.status === 404) {
+      $('#vNet').textContent = 'репозиторий не виден токену — выберите portfolio в Repository access';
+      mark('#dNet','bad'); return false;
     }
-    $('#vNet').textContent = 'только чтение — нужен Contents: read and write';
+    if (!r.ok) { $('#vNet').textContent = 'ошибка ' + r.status; mark('#dNet','bad'); return false; }
+
+    const w = await fetch('https://api.github.com/repos/' + REPO + '/git/blobs', {
+      method:'POST', headers: head,
+      body: JSON.stringify({ content:'xmile-admin-probe', encoding:'utf-8' })
+    });
+    if (w.ok) { $('#vNet').textContent = 'запись подтверждена'; mark('#dNet','ok'); return true; }
+    if (w.status === 403 || w.status === 404) {
+      $('#vNet').textContent = 'нет права на запись — включите Contents: Read and write';
+      mark('#dNet','bad'); return false;
+    }
+    $('#vNet').textContent = 'запись отклонена, код ' + w.status;
     mark('#dNet','bad'); return false;
   } catch (e) {
     $('#vNet').textContent = 'сеть недоступна'; mark('#dNet','bad'); return false;
